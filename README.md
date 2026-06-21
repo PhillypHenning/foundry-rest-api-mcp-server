@@ -49,6 +49,12 @@ Everything else in the relay (dice rolls, chat, encounters/combat, scenes, canva
 4. Pull granular, ordered tasks from the **[V1 project board](https://github.com/users/PhillypHenning/projects/4)** / [issues](https://github.com/PhillypHenning/foundry-rest-api-mcp-server/issues) (milestone `V1 — Content Authoring`). Each issue carries goal, endpoint+scope, file paths, acceptance criteria, and `Depends on #N`.
 5. The [`reference/`](./reference/) folder holds the relay's own docs/examples, mirrored verbatim from the upstream **MIT**-licensed repo for offline ground-truth (attribution in [`reference/SOURCE.md`](./reference/SOURCE.md); regenerate with [`scripts/fetch-reference.sh`](./scripts/fetch-reference.sh)). Filenames mirror their repo paths (e.g. `docs_md_api_entity.md`, `docs_examples_dnd5e-examples.json`).
 
+## Decision records & specs
+- [`decisions/`](./decisions/) — **architecture & management** decisions as ADRs, numbered `NNNN-*.md`. Each captures one decision (status · context · decision · consequences) and is immutable once **Accepted**; a later ADR **supersedes** an earlier one by reference, so history is never edited in place. Index + convention: [`decisions/README.md`](./decisions/README.md).
+- [`specs/`](./specs/) — **technical** component specs, numbered `NNNN-*.md` — the internal contracts the code implements (relay client, tool surface, dnd5e NPC builder). Index: [`specs/README.md`](./specs/README.md).
+
+The top-level docs (`IMPLEMENTATION_PLAN.md`, `EXECUTION_STRATEGY.md`, `API_SPEC.md`) are the elaborated references; the ADRs are the atomic, supersede-able record of *why*.
+
 ## Getting a properly-scoped API key (do this before any write works)
 
 A read-only key returns `403 API key lacks required scope: entity:write`. You cannot add scopes to an existing key value — mint a new one that includes all five v1 scopes:
