@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 const ConfigSchema = z.object({
-  apiKey: z.string().min(1),
-  relayUrl: z.string().url().default("https://foundryrestapi.com"),
+  apiKey: z.string().min(1, "FOUNDRY_API_KEY is required"),
+  relayUrl: z.string().url("FOUNDRY_RELAY_URL must be a valid URL"),
   clientId: z.string().optional(),
   userId: z.string().optional(),
 });
@@ -19,10 +19,14 @@ export function loadConfig(): Config {
 
   const result = ConfigSchema.safeParse(raw);
   if (!result.success) {
+    const details = result.error.issues
+      .map((i) => `  - ${i.path.join(".") || "(config)"}: ${i.message}`)
+      .join("\n");
     process.stderr.write(
-      "Error: FOUNDRY_API_KEY is required.\n" +
-        "Set it in your environment or .env file.\n" +
-        "Get a key at https://foundryvtt-rest-api-relay.fly.dev\n"
+      "Error: invalid configuration.\n" +
+        details +
+        "\nSet the required environment variables (see .env.example).\n" +
+        "Get a key at https://foundryrestapi.com\n"
     );
     process.exit(1);
   }

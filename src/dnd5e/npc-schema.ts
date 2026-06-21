@@ -83,6 +83,7 @@ function makeWeaponItem(attack: NpcAttack) {
   // dnd5e v5.2.2 weapon Item with the activities model.
   // activities is a Record<string, ActivityData> keyed by a generated id.
   const activityId = randomId();
+  const isRanged = attack.range !== undefined;
   const damageRolls = attack.damage.map((d) => ({
     formula: d.formula,
     types: [d.type],
@@ -115,12 +116,12 @@ function makeWeaponItem(attack: NpcAttack) {
             parts: damageRolls,
           },
           attack: {
-            ability: attack.abilityMod ?? "str",
+            ability: attack.abilityMod ?? (isRanged ? "dex" : "str"),
             bonus:
               attack.toHit !== undefined ? String(attack.toHit) : "",
             flat: attack.toHit !== undefined,
             type: {
-              value: "mwak",
+              value: isRanged ? "rwak" : "mwak",
               classification: "weapon",
             },
           },

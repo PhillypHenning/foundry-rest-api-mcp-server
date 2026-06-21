@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { makeCallRelay } from "../src/relay/client.js";
 import { unwrapEnvelope } from "../src/relay/envelope.js";
-import { mapHttpError } from "../src/relay/errors.js";
+import { mapHttpError, timeoutError, networkError } from "../src/relay/errors.js";
 import type { Config } from "../src/config.js";
 
 const config: Config = {
@@ -13,38 +13,69 @@ const config: Config = {
 
 // ── envelope ──────────────────────────────────────────────────────────────────
 describe("unwrapEnvelope", () => {
-  it("returns clients array as-is for /clients shape", () => {
+  it("returns clients payload as-is for /clients shape (no envelope metadata)", () => {
     const raw = { clients: [{ clientId: "fvtt_1" }], total: 1 };
     expect(unwrapEnvelope(raw)).toBe(raw);
   });
 
-  it("returns data key from create envelope", () => {
-    const raw = { type: "create-result", requestId: "x", data: { id: "1" } };
-    expect(unwrapEnvelope(raw)).toEqual({ id: "1" });
-  });
-
-  it("returns uuid from get envelope", () => {
+  it("returns the data payload for /get", () => {
     const raw = {
       type: "get-result",
       requestId: "x",
       uuid: "Actor.abc",
       data: { name: "Goblin" },
     };
-    // data comes before uuid in PAYLOAD_KEYS, so we get data
     expect(unwrapEnvelope(raw)).toEqual({ name: "Goblin" });
   });
 
-  it("returns results from search envelope", () => {
+  it("returns the data payload for /create-folder", () => {
+    const raw = {
+      type: "create-folder-result",
+      requestId: "x",
+      data: { id: "1", uuid: "Folder.1", name: "NPCs" },
+    };
+    expect(unwrapEnvelope(raw)).toEqual({ id: "1", uuid: "Folder.1", name: "NPCs" });
+  });
+
+  it("returns the results array for /search", () => {
     const raw = {
       type: "search-result",
       requestId: "x",
       filter: "Actor",
       results: [{ uuid: "Actor.1", name: "Goblin" }],
     };
-    // filter comes last; results is before filter in PAYLOAD_KEYS? No — let me check order
-    // PAYLOAD_KEYS = ["data", "uuid", "entity", "results", "clients", "filter"]
-    // results is found first here since data/uuid/entity absent
     expect(unwrapEnvelope(raw)).toEqual([{ uuid: "Actor.1", name: "Goblin" }]);
+  });
+
+  it("preserves BOTH uuid and entity for /create (no longer lossy)", () => {
+    const raw = {
+      type: "create-result",
+      requestId: "x",
+      uuid: "Actor.new",
+      entity: { _id: "new", name: "Created" },
+    };
+    expect(unwrapEnvelope(raw)).toEqual({
+      uuid: "Actor.new",
+      entity: { _id: "new", name: "Created" },
+    });
+  });
+
+  it("preserves uuid and entity[] for /update", () => {
+    const raw = {
+      type: "update-result",
+      requestId: "x",
+      uuid: "Actor.1",
+      entity: [{ name: "Renamed" }],
+    };
+    expect(unwrapEnvelope(raw)).toEqual({
+      uuid: "Actor.1",
+      entity: [{ name: "Renamed" }],
+    });
+  });
+
+  it("unwraps a single remaining key (e.g. /kill results)", () => {
+    const raw = { type: "kill-result", requestId: "x", results: [{ hp: 0 }] };
+    expect(unwrapEnvelope(raw)).toEqual([{ hp: 0 }]);
   });
 
   it("handles bare session objects (no type/requestId)", () => {
@@ -184,5 +215,32 @@ describe("callRelay", () => {
     await expect(callRelay("GET", "/get")).rejects.toMatchObject({
       code: "success_false",
     });
+  });
+
+  it("converts a transport failure into a RelayError (not a raw throw)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed: ECONNREFUSED"))
+    );
+    const callRelay = makeCallRelay(config);
+    await expect(callRelay("GET", "/clients")).rejects.toMatchObject({
+      name: "RelayError",
+      code: "network_error",
+    });
+  });
+});
+
+// ── error constructors ────────────────────────────────────────────────────────
+describe("error constructors", () => {
+  it("timeoutError reports the timeout duration", () => {
+    const err = timeoutError(30_000);
+    expect(err.code).toBe("timeout");
+    expect(err.message).toContain("30000ms");
+  });
+
+  it("networkError includes the underlying cause", () => {
+    const err = networkError(new Error("ECONNREFUSED"));
+    expect(err.code).toBe("network_error");
+    expect(err.message).toContain("ECONNREFUSED");
   });
 });

@@ -1,12 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Deps, ToolModule } from "./types.js";
-import { ok, fail } from "./types.js";
-import { RelayError } from "../relay/errors.js";
+import type { Deps, ToolHandle, ToolModule } from "./types.js";
+import { ok, withErrors, targeting, targetingQuery } from "./types.js";
 
 export const searchModule: ToolModule = {
-  register(server: McpServer, deps: Deps): void {
-    server.registerTool(
+  register(server: McpServer, deps: Deps): ToolHandle[] {
+    const tool = server.registerTool(
       "foundry_search",
       {
         title: "Search Foundry Entities",
@@ -37,35 +36,24 @@ export const searchModule: ToolModule = {
             .boolean()
             .optional()
             .describe("Exclude compendium results"),
-          clientId: z
-            .string()
-            .optional()
-            .describe("Override the default clientId for this call"),
+          ...targeting,
         },
-        annotations: {
-          readOnlyHint: true,
-          openWorldHint: true,
-        },
+        annotations: { readOnlyHint: true, openWorldHint: true },
       },
-      async (args) => {
-        try {
-          const query: Record<string, string | number | boolean | undefined> = {
-            query: args.query,
-            limit: args.limit,
-            minified: args.minified,
-          };
-          if (args.filter) query.filter = args.filter;
-          if (args.excludeCompendiums !== undefined)
-            query.excludeCompendiums = args.excludeCompendiums;
-          if (args.clientId) query.clientId = args.clientId;
+      withErrors(async (args) => {
+        const query: Record<string, string | number | boolean | undefined> = {
+          ...targetingQuery(args),
+          query: args.query,
+          limit: args.limit,
+          minified: args.minified,
+        };
+        if (args.filter) query.filter = args.filter;
+        if (args.excludeCompendiums !== undefined)
+          query.excludeCompendiums = args.excludeCompendiums;
 
-          const data = await deps.callRelay("GET", "/search", { query });
-          return ok(data);
-        } catch (e) {
-          if (e instanceof RelayError) return fail(e.message);
-          throw e;
-        }
-      }
+        return ok(await deps.callRelay("GET", "/search", { query }));
+      })
     );
+    return [tool];
   },
 };

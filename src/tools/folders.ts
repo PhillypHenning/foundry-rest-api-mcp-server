@@ -1,8 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Deps, ToolModule } from "./types.js";
-import { ok, fail } from "./types.js";
-import { RelayError } from "../relay/errors.js";
+import type { Deps, ToolHandle, ToolModule } from "./types.js";
+import { ok, fail, withErrors, targeting, targetingQuery } from "./types.js";
 
 const FOLDER_TYPES = [
   "Actor",
@@ -16,8 +15,8 @@ const FOLDER_TYPES = [
 ] as const;
 
 export const foldersModule: ToolModule = {
-  register(server: McpServer, deps: Deps): void {
-    server.registerTool(
+  register(server: McpServer, deps: Deps): ToolHandle[] {
+    const tool = server.registerTool(
       "foundry_manage_folder",
       {
         title: "Manage Foundry Folder",
@@ -52,51 +51,34 @@ export const foldersModule: ToolModule = {
               "[delete] If true, also delete all entities inside the folder (irreversible)"
             ),
 
-          clientId: z
-            .string()
-            .optional()
-            .describe("Override the default clientId"),
+          ...targeting,
         },
-        annotations: {
-          openWorldHint: true,
-        },
+        // Mixed: create is safe, delete is destructive. We annotate
+        // conservatively (destructive) because the tool can delete.
+        annotations: { openWorldHint: true, destructiveHint: true },
       },
-      async (args) => {
-        const query: Record<string, string | number | boolean | undefined> = {};
-        if (args.clientId) query.clientId = args.clientId;
+      withErrors(async (args) => {
+        const query: Record<string, string | number | boolean | undefined> = {
+          ...targetingQuery(args),
+        };
 
-        try {
-          if (args.action === "create") {
-            if (!args.name) return fail("create requires name");
-            if (!args.folderType) return fail("create requires folderType");
-            // API accepts params in query even for POST
-            query.name = args.name;
-            query.folderType = args.folderType;
-            if (args.parentFolderId)
-              query.parentFolderId = args.parentFolderId;
-            const data = await deps.callRelay("POST", "/create-folder", {
-              query,
-            });
-            return ok(data);
-          }
-
-          if (args.action === "delete") {
-            if (!args.folderId) return fail("delete requires folderId");
-            query.folderId = args.folderId;
-            if (args.deleteAll !== undefined)
-              query.deleteAll = args.deleteAll;
-            const data = await deps.callRelay("DELETE", "/delete-folder", {
-              query,
-            });
-            return ok(data);
-          }
-
-          return fail(`Unknown action: ${args.action}`);
-        } catch (e) {
-          if (e instanceof RelayError) return fail(e.message);
-          throw e;
+        if (args.action === "create") {
+          if (!args.name) return fail("create requires name");
+          if (!args.folderType) return fail("create requires folderType");
+          // The relay accepts these params via query even for POST.
+          query.name = args.name;
+          query.folderType = args.folderType;
+          if (args.parentFolderId) query.parentFolderId = args.parentFolderId;
+          return ok(await deps.callRelay("POST", "/create-folder", { query }));
         }
-      }
+
+        // delete
+        if (!args.folderId) return fail("delete requires folderId");
+        query.folderId = args.folderId;
+        if (args.deleteAll !== undefined) query.deleteAll = args.deleteAll;
+        return ok(await deps.callRelay("DELETE", "/delete-folder", { query }));
+      })
     );
+    return [tool];
   },
 };

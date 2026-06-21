@@ -1,5 +1,5 @@
 import type { Config } from "../config.js";
-import { mapHttpError, RelayError } from "./errors.js";
+import { mapHttpError, networkError, timeoutError, RelayError } from "./errors.js";
 import { unwrapEnvelope } from "./envelope.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
@@ -29,26 +29,21 @@ export function makeCallRelay(config: Config): CallRelayFn {
 
     const url = new URL(path, config.relayUrl);
 
-    // clientId and userId always go in query string
+    // clientId and userId always go in the query string (never headers).
+    // A per-call override in `query` takes precedence via set().
     if (config.clientId) url.searchParams.set("clientId", config.clientId);
     if (config.userId) url.searchParams.set("userId", config.userId);
-
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined) url.searchParams.set(k, String(v));
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
     const signal = opts.signal
-      ? anySignal([opts.signal, controller.signal])
-      : controller.signal;
+      ? AbortSignal.any([opts.signal, timeoutSignal])
+      : timeoutSignal;
 
-    const headers: Record<string, string> = {
-      "x-api-key": config.apiKey,
-    };
-    if (body !== undefined) {
-      headers["Content-Type"] = "application/json";
-    }
+    const headers: Record<string, string> = { "x-api-key": config.apiKey };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
 
     let response: Response;
     try {
@@ -58,8 +53,11 @@ export function makeCallRelay(config: Config): CallRelayFn {
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal,
       });
-    } finally {
-      clearTimeout(timer);
+    } catch (e) {
+      // Surface transport failures as RelayError so tools return isError
+      // results rather than throwing (cross-cutting requirement #1).
+      if (timeoutSignal.aborted) throw timeoutError(timeoutMs);
+      throw networkError(e);
     }
 
     let responseBody: unknown;
@@ -74,7 +72,7 @@ export function makeCallRelay(config: Config): CallRelayFn {
       throw mapHttpError(response.status, responseBody);
     }
 
-    // Also treat success:false as an error
+    // Treat HTTP 200 with success:false as an error too.
     if (
       responseBody != null &&
       typeof responseBody === "object" &&
@@ -89,21 +87,6 @@ export function makeCallRelay(config: Config): CallRelayFn {
       );
     }
 
-    if (rawEnvelope) return responseBody;
-    return unwrapEnvelope(responseBody);
+    return rawEnvelope ? responseBody : unwrapEnvelope(responseBody);
   };
-}
-
-function anySignal(signals: AbortSignal[]): AbortSignal {
-  const controller = new AbortController();
-  for (const sig of signals) {
-    if (sig.aborted) {
-      controller.abort(sig.reason);
-      return controller.signal;
-    }
-    sig.addEventListener("abort", () => controller.abort(sig.reason), {
-      once: true,
-    });
-  }
-  return controller.signal;
 }

@@ -2,7 +2,7 @@
 
 An MCP (Model Context Protocol) server that wraps the **ThreeHats Foundry VTT REST API relay**, so an LLM agent (Claude Code / Claude Desktop) can author and manage Foundry VTT content — primarily **creating D&D 5e creatures** — through native MCP tools instead of raw HTTP calls.
 
-> **Status:** Planning. This repo currently contains the **spec + implementation plan only**. No server code yet. The plan in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) is written to be executed by a coding agent ("the secondary system").
+> **Status:** V1 implemented. The stdio MCP server lives under [`src/`](./src) with unit tests under [`test/`](./test). See **[Install & configure](#install--configure)** below to run it. The original plan that drove the build is in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -40,6 +40,80 @@ Everything else in the relay (dice rolls, chat, encounters/combat, scenes, canva
 - **Build/package:** `tsup` → single `npx`-runnable bin.
 - **Config:** env vars — `FOUNDRY_API_KEY` (the `x-api-key`), `FOUNDRY_RELAY_URL` (default `https://foundryrestapi.com`), `FOUNDRY_CLIENT_ID` (optional; auto-resolves if one world is online), `FOUNDRY_USER_ID` (optional; omit = GM-level).
 - **Tool surface:** small set of mostly single-purpose tools (~9 in v1), façades only where operations are homogeneous. Per-endpoint-explosion is explicitly avoided — LLM tool-selection reliability degrades past ~30–40 tools and every tool is permanent context cost.
+
+## Install & configure
+
+### Build from source
+
+```bash
+npm install
+npm run build      # → dist/index.js (executable, #!/usr/bin/env node)
+npm test           # unit tests (mocked fetch)
+npm run inspect    # launch the MCP Inspector against dist/index.js
+```
+
+### Environment variables
+
+| Var | Required | Default | Purpose |
+|---|---|---|---|
+| `FOUNDRY_API_KEY` | **yes** | — | Sent as the `x-api-key` header. Must include all five v1 scopes (see below). |
+| `FOUNDRY_RELAY_URL` | no | `https://foundryrestapi.com` | Relay base URL. Set to `http://localhost:3010` for a self-hosted relay. |
+| `FOUNDRY_CLIENT_ID` | no | auto-resolves | Which connected world to target. Auto-resolves when exactly one world is online. |
+| `FOUNDRY_USER_ID` | no | GM-level | Scope actions to a Foundry user's permissions. Omit for GM access. |
+
+On startup the server logs the online world(s) to **stderr** and disables `foundry_create_creature` if the active world's system isn't `dnd5e`.
+
+### Tools (v1)
+
+`foundry_list_worlds` · `foundry_search` · `foundry_get_entity` · `foundry_create_entity` · `foundry_update_entity` · `foundry_delete_entity` · `foundry_modify_actor` · `foundry_create_creature` · `foundry_manage_folder`
+
+### Claude Code (`.mcp.json`)
+
+Add to `.mcp.json` in your project root (or via `claude mcp add`):
+
+```json
+{
+  "mcpServers": {
+    "foundry": {
+      "command": "node",
+      "args": ["/absolute/path/to/foundry-rest-api-mcp-server/dist/index.js"],
+      "env": {
+        "FOUNDRY_API_KEY": "your-scoped-key",
+        "FOUNDRY_CLIENT_ID": "fvtt_8bfa06d76c0c1ac5"
+      }
+    }
+  }
+}
+```
+
+### Claude Desktop (`claude_desktop_config.json`)
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "foundry": {
+      "command": "node",
+      "args": ["/absolute/path/to/foundry-rest-api-mcp-server/dist/index.js"],
+      "env": {
+        "FOUNDRY_API_KEY": "your-scoped-key",
+        "FOUNDRY_CLIENT_ID": "fvtt_8bfa06d76c0c1ac5"
+      }
+    }
+  }
+}
+```
+
+> Once published to npm, replace `"command": "node", "args": ["…/dist/index.js"]` with `"command": "npx", "args": ["-y", "foundry-rest-api-mcp-server"]`.
+
+### Live smoke test (optional)
+
+A gated end-to-end test creates then deletes a throwaway JournalEntry against the real relay:
+
+```bash
+FOUNDRY_LIVE_TEST=1 FOUNDRY_API_KEY=... FOUNDRY_CLIENT_ID=... npm test
+```
 
 ## How to use this repo (for the implementing agent)
 

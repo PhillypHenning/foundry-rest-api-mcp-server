@@ -80,3 +80,23 @@ export function mapHttpError(status: number, body: unknown): RelayError {
     raw
   );
 }
+
+/** A request that aborted because it exceeded its timeout. */
+export function timeoutError(timeoutMs: number): RelayError {
+  return new RelayError(
+    0,
+    "timeout",
+    `Request timed out after ${timeoutMs}ms. The relay or Foundry world may be unreachable or slow — check that the world is online.`
+  );
+}
+
+/** A transport-level failure (DNS, connection refused, TLS, etc.). */
+export function networkError(cause: unknown): RelayError {
+  const detail = cause instanceof Error ? cause.message : String(cause);
+  return new RelayError(
+    0,
+    "network_error",
+    `Could not reach the relay: ${detail}. Check FOUNDRY_RELAY_URL and your network connection.`,
+    cause
+  );
+}

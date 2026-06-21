@@ -14,6 +14,39 @@ function makeCallRelayMock(returnValue: unknown): CallRelayFn {
   return vi.fn().mockResolvedValue(returnValue);
 }
 
+type Reg = {
+  name: string;
+  meta: { annotations?: Record<string, unknown> };
+  handler: (args: Record<string, unknown>) => Promise<{ isError?: boolean }>;
+};
+
+/** Register a module against a fake server, capturing tool regs + handles. */
+function collectTools(
+  mod: import("../src/tools/types.js").ToolModule,
+  callRelay: CallRelayFn,
+  cfg: Config = config
+) {
+  const registrations: Reg[] = [];
+  const handles: Array<{ enable: ReturnType<typeof vi.fn>; disable: ReturnType<typeof vi.fn> }> = [];
+  const fakeServer = {
+    registerTool: (
+      name: string,
+      meta: Reg["meta"],
+      handler: Reg["handler"]
+    ) => {
+      registrations.push({ name, meta, handler });
+      const handle = { enable: vi.fn(), disable: vi.fn() };
+      handles.push(handle);
+      return handle;
+    },
+  };
+  mod.register(
+    fakeServer as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+    { callRelay, config: cfg }
+  );
+  return { registrations, handles };
+}
+
 // ── foundry_list_worlds annotations ──────────────────────────────────────────
 describe("worlds tool", () => {
   it("returns ok result with clients array", async () => {
@@ -388,5 +421,138 @@ describe("folders tool", () => {
       "/delete-folder",
       expect.anything()
     );
+  });
+});
+
+// ── withErrors wrapper ────────────────────────────────────────────────────────
+describe("withErrors", () => {
+  it("surfaces a RelayError as an isError result", async () => {
+    const { withErrors } = await import("../src/tools/types.js");
+    const handler = withErrors(async () => {
+      throw new RelayError(401, "auth_failed", "bad key");
+    });
+    const result = (await handler({})) as { isError?: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("bad key");
+  });
+
+  it("re-throws non-RelayError (genuine bugs are not swallowed)", async () => {
+    const { withErrors } = await import("../src/tools/types.js");
+    const handler = withErrors(async () => {
+      throw new TypeError("boom");
+    });
+    await expect(handler({})).rejects.toThrow("boom");
+  });
+});
+
+// ── userId override ───────────────────────────────────────────────────────────
+describe("userId / clientId targeting override", () => {
+  it("threads userId and clientId into the query", async () => {
+    const { searchModule } = await import("../src/tools/search.js");
+    const callRelay: CallRelayFn = vi.fn().mockResolvedValue([]);
+    const { registrations } = collectTools(searchModule, callRelay);
+    const tool = registrations.find((r) => r.name === "foundry_search")!;
+    await tool.handler({
+      query: "goblin",
+      limit: 50,
+      minified: true,
+      clientId: "fvtt_override",
+      userId: "user_42",
+    });
+    expect(callRelay).toHaveBeenCalledWith(
+      "GET",
+      "/search",
+      expect.objectContaining({
+        query: expect.objectContaining({
+          clientId: "fvtt_override",
+          userId: "user_42",
+        }),
+      })
+    );
+  });
+});
+
+// ── ranged vs melee attack classification ────────────────────────────────────
+describe("npc-schema attack classification", () => {
+  it("marks an attack with range as rwak, otherwise mwak", async () => {
+    const { buildNpcDocument } = await import("../src/dnd5e/npc-schema.js");
+    const doc = buildNpcDocument({
+      name: "Archer",
+      size: "med",
+      type: "humanoid",
+      cr: 1,
+      ac: 13,
+      hp: { value: 11, max: 11 },
+      abilities: { str: 10, dex: 16, con: 12, int: 10, wis: 11, cha: 10 },
+      attacks: [
+        { name: "Shortbow", range: "80/320 ft", damage: [{ formula: "1d6+3", type: "piercing" }] },
+        { name: "Dagger", damage: [{ formula: "1d4+3", type: "piercing" }] },
+      ],
+    }) as { items: Array<{ name: string; system: { activities: Record<string, { attack: { type: { value: string } } }> } }> };
+
+    const typeOf = (name: string) => {
+      const item = doc.items.find((i) => i.name === name)!;
+      const activity = Object.values(item.system.activities)[0];
+      return activity.attack.type.value;
+    };
+    expect(typeOf("Shortbow")).toBe("rwak");
+    expect(typeOf("Dagger")).toBe("mwak");
+  });
+});
+
+// ── system gating (#14) ───────────────────────────────────────────────────────
+describe("system gating", () => {
+  it("resolveActiveWorld picks the configured clientId", async () => {
+    const { resolveActiveWorld } = await import("../src/tools/worlds.js");
+    const callRelay: CallRelayFn = vi.fn().mockResolvedValue({
+      clients: [
+        { clientId: "fvtt_test", systemId: "dnd5e", isOnline: true },
+        { clientId: "fvtt_other", systemId: "pf2e", isOnline: true },
+      ],
+      total: 2,
+    });
+    const active = await resolveActiveWorld({ callRelay, config });
+    expect(active?.clientId).toBe("fvtt_test");
+  });
+
+  it("resolveActiveWorld picks the sole online world when no clientId configured", async () => {
+    const { resolveActiveWorld } = await import("../src/tools/worlds.js");
+    const callRelay: CallRelayFn = vi.fn().mockResolvedValue({
+      clients: [
+        { clientId: "fvtt_a", systemId: "pf2e", isOnline: true },
+        { clientId: "fvtt_b", systemId: "dnd5e", isOnline: false },
+      ],
+      total: 2,
+    });
+    const cfg: Config = { ...config, clientId: undefined };
+    const active = await resolveActiveWorld({ callRelay, config: cfg });
+    expect(active?.clientId).toBe("fvtt_a");
+  });
+
+  it("disables the creature tool on a non-dnd5e world", async () => {
+    const { applySystemGating } = await import("../src/server.js");
+    const handle = { enable: vi.fn(), disable: vi.fn() };
+    applySystemGating(
+      { clientId: "fvtt_x", systemId: "pf2e" },
+      handle
+    );
+    expect(handle.disable).toHaveBeenCalledOnce();
+  });
+
+  it("leaves the creature tool enabled on a dnd5e world", async () => {
+    const { applySystemGating } = await import("../src/server.js");
+    const handle = { enable: vi.fn(), disable: vi.fn() };
+    applySystemGating(
+      { clientId: "fvtt_x", systemId: "dnd5e" },
+      handle
+    );
+    expect(handle.disable).not.toHaveBeenCalled();
+  });
+
+  it("leaves the creature tool enabled when the world can't be resolved", async () => {
+    const { applySystemGating } = await import("../src/server.js");
+    const handle = { enable: vi.fn(), disable: vi.fn() };
+    applySystemGating(undefined, handle);
+    expect(handle.disable).not.toHaveBeenCalled();
   });
 });
