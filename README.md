@@ -44,8 +44,10 @@ Everything else in the relay (dice rolls, chat, encounters/combat, scenes, canva
 ## How to use this repo (for the implementing agent)
 
 1. Read [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) top to bottom. Work the **phases in order**; each step lists its goal, the files it touches, the exact work, and an acceptance check.
-2. Use [`API_SPEC.md`](./API_SPEC.md) as the authoritative endpoint reference (request/response shapes, scopes, quirks, the dnd5e NPC schema notes).
-3. The [`reference/`](./reference/) folder holds the relay's own docs/examples, mirrored verbatim from the upstream **MIT**-licensed repo for offline ground-truth (attribution in [`reference/SOURCE.md`](./reference/SOURCE.md); regenerate with [`scripts/fetch-reference.sh`](./scripts/fetch-reference.sh)). Filenames mirror their repo paths (e.g. `docs_md_api_entity.md`, `docs_examples_dnd5e-examples.json`).
+2. Read [`EXECUTION_STRATEGY.md`](./EXECUTION_STRATEGY.md) for **how to run the build** — recommended model/effort per ticket, the sequential-foundation → parallel-fan-out → sequential-convergence order, and the branch-per-work-stream (trunk-based) strategy with worktrees + CI gates.
+3. Use [`API_SPEC.md`](./API_SPEC.md) as the authoritative endpoint reference (request/response shapes, scopes, quirks, the dnd5e NPC schema notes).
+4. Pull granular, ordered tasks from the **[V1 project board](https://github.com/users/PhillypHenning/projects/4)** / [issues](https://github.com/PhillypHenning/foundry-rest-api-mcp-server/issues) (milestone `V1 — Content Authoring`). Each issue carries goal, endpoint+scope, file paths, acceptance criteria, and `Depends on #N`.
+5. The [`reference/`](./reference/) folder holds the relay's own docs/examples, mirrored verbatim from the upstream **MIT**-licensed repo for offline ground-truth (attribution in [`reference/SOURCE.md`](./reference/SOURCE.md); regenerate with [`scripts/fetch-reference.sh`](./scripts/fetch-reference.sh)). Filenames mirror their repo paths (e.g. `docs_md_api_entity.md`, `docs_examples_dnd5e-examples.json`).
 
 ## Getting a properly-scoped API key (do this before any write works)
 
