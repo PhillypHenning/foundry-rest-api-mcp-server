@@ -70,7 +70,7 @@ Wave 4   #15 tests + packaging + README + Inspector    (sequential — whole-pic
 | `feat/tool-entity` | #7→#8→#9 | ″ | tests + create/get/update/delete round-trip |
 | `feat/tool-actor` | #10 | ″ | tests + live modify |
 | `feat/tool-folders` | #13 | ″ | tests + create-into-folder |
-| `feat/creature` | #12 | `main` (after spike + entity) | Jabberwocky + Hagspawn son render correctly |
+| `feat/creature` | #12 | `main` (after spike + entity) | example NPCs render correctly with working attacks |
 | `chore/harden` | #14 | `main` (after tools) | annotation tests; non-dnd5e gating |
 | `chore/release` | #15 | `main` (last) | `npm test` green, Inspector full, README config works |
 

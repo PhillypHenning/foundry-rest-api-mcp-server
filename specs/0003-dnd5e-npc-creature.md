@@ -16,4 +16,4 @@
 Before authoring attacks, read a real v5.2.2 NPC (`foundry_get_entity` with `selected:true, actor:true`, or a Compendium UUID). The dnd5e **"activities"** damage model (4.x+) differs from the relay's 4.3.8 examples — capture the exact weapon/activities layout in `../reference/dnd5e-5.2.2-npc-schema.md` and build against it. **Do not guess the attack schema.**
 
 ## Acceptance
-Create the Session-9 **Jabberwocky** and **Hagspawn son** (lvl-7 barbarian) as NPCs that open in Foundry with correct HP/AC/CR and a functioning attack.
+Create dnd5e NPCs — including a custom homebrew monster with a melee attack and a class-based humanoid (e.g. a leveled barbarian) — that open in Foundry with correct HP/AC/CR and a functioning attack.

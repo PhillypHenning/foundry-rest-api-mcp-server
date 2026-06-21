@@ -6,7 +6,7 @@ This is the architecture + phase overview. **Granular, pullable work items live 
 
 Ship an `npx`-runnable stdio MCP server that lets an LLM **author Foundry content** — above all, **create dnd5e creatures** — via the ThreeHats relay. Scopes: `clients:read`, `search`, `entity:read`, `entity:write`, `structure:write`.
 
-Definition of done for V1: from Claude, create the Session-9 **Jabberwocky** and **Hagspawn son** as real dnd5e NPC actors (correct HP/AC/CR/abilities/attacks), search/read existing monsters to clone, and file new content into folders — all through MCP tools.
+Definition of done for V1: from Claude, create dnd5e NPC actors (correct HP/AC/CR/abilities/attacks) — including custom homebrew monsters and class-based humanoids — search/read existing monsters to clone, and file new content into folders — all through MCP tools.
 
 ## Architecture
 
