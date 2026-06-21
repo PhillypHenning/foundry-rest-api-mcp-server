@@ -79,7 +79,7 @@ Add to `.mcp.json` in your project root (or via `claude mcp add`):
       "args": ["/absolute/path/to/foundry-rest-api-mcp-server/dist/index.js"],
       "env": {
         "FOUNDRY_API_KEY": "your-scoped-key",
-        "FOUNDRY_CLIENT_ID": "fvtt_8bfa06d76c0c1ac5"
+        "FOUNDRY_CLIENT_ID": "fvtt_xxxxxxxxxxxxxxxx"
       }
     }
   }
@@ -98,7 +98,7 @@ Add to `.mcp.json` in your project root (or via `claude mcp add`):
       "args": ["/absolute/path/to/foundry-rest-api-mcp-server/dist/index.js"],
       "env": {
         "FOUNDRY_API_KEY": "your-scoped-key",
-        "FOUNDRY_CLIENT_ID": "fvtt_8bfa06d76c0c1ac5"
+        "FOUNDRY_CLIENT_ID": "fvtt_xxxxxxxxxxxxxxxx"
       }
     }
   }
@@ -136,4 +136,4 @@ A read-only key returns `403 API key lacks required scope: entity:write`. You ca
 - **Dashboard:** log in at `https://foundryrestapi.com` → **API Keys** → **Create Scoped Key** → tick `clients:read`, `search`, `entity:read`, `entity:write`, `structure:write` → copy the key (shown once).
 - **Programmatic (device flow):** `POST /auth/key-request` with `{"appName":"foundry-mcp","scopes":["clients:read","search","entity:read","entity:write","structure:write"]}` → open the returned `approvalUrl` → poll `GET /auth/key-request/:code/status` until `approved` (the response then includes `apiKey`).
 
-The known target world for this project is **"Wilds Beyond the Witchlight"**, `clientId` `fvtt_8bfa06d76c0c1ac5` (dnd5e 5.2.2, Foundry v13.351).
+`FOUNDRY_CLIENT_ID` (format `fvtt_<16hex>`) selects which connected world to target. It is optional — it auto-resolves when exactly one world is online. To discover the IDs of connected worlds, call the `foundry_list_worlds` tool (or `GET /clients`).

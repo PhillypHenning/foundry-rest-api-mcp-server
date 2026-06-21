@@ -123,7 +123,7 @@ Illustrative NPC `POST /create` skeleton (top-level shape is correct; treat `ite
 {
   "entityType": "Actor",
   "data": {
-    "name": "Jabberwocky",
+    "name": "Example Monster",
     "type": "npc",
     "img": "icons/creatures/...",
     "system": {
@@ -136,12 +136,12 @@ Illustrative NPC `POST /create` skeleton (top-level shape is correct; treat `ite
         "senses": { "darkvision": 60, "units": "ft" }
       },
       "details": { "cr": 6, "type": {"value":"monstrosity"}, "alignment": "Chaotic Evil",
-                   "source": {"custom":"Witchlight Homebrew"}, "biography": {"value":"<p>…</p>"} },
+                   "source": {"custom":"Homebrew"}, "biography": {"value":"<p>…</p>"} },
       "traits": { "size": "huge", "languages": {"value":[]},
                   "dr": {"value":[]}, "di": {"value":[]}, "dv": {"value":[]}, "ci": {"value":[]} }
     },
     "items": [ /* embedded weapon/feat Items — schema VERIFIED from a live v5.2.2 NPC */ ],
-    "prototypeToken": { "name": "Jabberwocky", "actorLink": false, "disposition": -1 }
+    "prototypeToken": { "name": "Example Monster", "actorLink": false, "disposition": -1 }
   }
 }
 ```

@@ -333,7 +333,7 @@ describe("creature tool", () => {
       (r) => r.name === "foundry_create_creature"
     )!;
     await tool.handler({
-      name: "Jabberwocky",
+      name: "Example Monster",
       size: "huge",
       type: "monstrosity",
       cr: 6,
